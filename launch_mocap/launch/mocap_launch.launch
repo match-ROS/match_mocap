@@ -1,6 +1,8 @@
 <launch>
 
-<!-- do something here -->
-
+<!-- launch qualisys launch file -->
+<include file="$(find mocap_qualisys)/launch/qualisys.launch">
+     <arg name="server_address" value="QTM"/>
+</include>
 
 </launch>

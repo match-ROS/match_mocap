@@ -118,7 +118,8 @@ class node:
         #Start the data stream and the startup procedure
         while not rospy.is_shutdown():
             if self.finished is False:
-                await self.get_info("10.145.8.212")
+                #await self.get_info("10.145.8.212")
+                await self.get_info(QTM)
             else:
                 break
             #Sleep for 1 second after the data stream is finished
