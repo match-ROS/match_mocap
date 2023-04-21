@@ -1,0 +1,3 @@
+[submodule "motion_capture_system"]
+	path = motion_capture_system
+	url = https://github.com/KTH-SML/motion_capture_system.git
