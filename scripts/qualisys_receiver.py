@@ -3,7 +3,6 @@
 """
 Script to receive data from Qualisys motion capture system
 and publish it to ROS topic.
-Ask at startup which rigid body should be published.
 First argument should be the id of the rigid body.
 If no argument is given, all rigid bodies are printed.
 """
