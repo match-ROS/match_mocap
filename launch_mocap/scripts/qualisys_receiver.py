@@ -119,7 +119,7 @@ class node:
         while not rospy.is_shutdown():
             if self.finished is False:
                 #await self.get_info("10.145.8.212")
-                await self.get_info(QTM)
+                await self.get_info("192.168.254.1")
             else:
                 break
             #Sleep for 1 second after the data stream is finished
