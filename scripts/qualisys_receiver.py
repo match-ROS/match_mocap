@@ -20,6 +20,7 @@ class node:
     is_connected = False
     shutdown = False
     connection = None
+    finished = False
     rigid_bodies = []
     
     #min and max id of the points of the rigid body
@@ -60,7 +61,7 @@ class node:
             #Connect to the mocap system
             self.connection = await qtm.connect(ip)
             self.is_connected = True
-            rospy.loginfo("%s", self.is_connected)
+            rospy.loginfo("Connection: %s", self.is_connected)
 
             #Get the rigid bodies from a xml string
             xml_string = await self.connection.get_parameters(parameters=["6d"])
@@ -87,6 +88,7 @@ class node:
             #If no argument is given, print the rigid bodies
             if len(sys.argv) == 1:
                 rospy.loginfo("%s", self.rigid_bodies)
+                self.finished = True
             
             #If an argument is given, set the min and max id of the points of the rigid body to publish
             else:
@@ -115,11 +117,15 @@ class node:
         self.rate = rospy.Rate(10)
         #Start the data stream and the startup procedure
         while not rospy.is_shutdown():
-            await self.get_info("192.168.254.1")
+            if self.finished is False:
+                await self.get_info("10.145.8.212")
+            else:
+                break
             #Sleep for 1 second after the data stream is finished
             rospy.sleep(1)
 
 if __name__ == '__main__':
+    rospy.loginfo("Start node")
     node = node()
     #Start the node with asyncio because the qtm module is asynchronous
     loop = asyncio.run(node.run())
