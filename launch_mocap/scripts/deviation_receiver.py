@@ -15,7 +15,6 @@ import math
 from matplotlib import pyplot as plt
 
 class node():
-
     # Variables 
     # self.point_list is a list of all the poses received by the robot
     point_list = []
@@ -132,6 +131,7 @@ class node():
 
         rospy.loginfo("Radius of circle: %s", sum(radius)/len(radius))
 
+        # Shutdown the node
         rospy.signal_shutdown("Shutting down")
 
 
