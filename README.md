@@ -29,12 +29,12 @@ The x and y coordinates can be calculated by defining three circles. The center 
 
 The z-rotation phi can now be approximated.  Since we are looking for a transformation matrix:
 
-![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Clarge%20%5E%7BQ%7D%20T%20_%7BM%7D%20%5Ccdot%20_%7B%28Q%29%7Dr%20%3D%20_%7B%28M%29%7Dr)
+![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Cbg_white%20%5Clarge%20%5E%7BQ%7D%20T%20_%7BM%7D%20%5Ccdot%20_%7B%28Q%29%7Dr%20%3D%20_%7B%28M%29%7Dr)
 
 These formulas can be derived from this:
 
-![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Clarge%20_%7B%28M%29%7Dx%3D_%7B%28Q%29%7Dx%5Ccdot%20cos%28%5Cvarphi%20%29%20-%20_%7B%28Q%29%7Dy*sin%28%5Cvarphi%29&plus;_%7B%28M%29%7Dx_%7BQualisys%2Cbase%7D)
-![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Clarge%20_%7B%28M%29%7Dy%3D_%7B%28Q%29%7Dx%5Ccdot%20sin%28%5Cvarphi%20%29%20&plus;%20_%7B%28Q%29%7Dy*cos%28%5Cvarphi%29&plus;_%7B%28M%29%7Dy_%7BQualisys%2Cbase%7D)
+![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Cbg_white%20%5Clarge%20_%7B%28M%29%7Dx%3D_%7B%28Q%29%7Dx%5Ccdot%20cos%28%5Cvarphi%20%29%20-%20_%7B%28Q%29%7Dy*sin%28%5Cvarphi%29&plus;_%7B%28M%29%7Dx_%7BQualisys%2Cbase%7D)
+![](https://latex.codecogs.com/png.latex?%5Cdpi%7B100%7D%20%5Cbg_white%20%5Clarge%20_%7B%28M%29%7Dy%3D_%7B%28Q%29%7Dx%5Ccdot%20sin%28%5Cvarphi%20%29%20&plus;%20_%7B%28Q%29%7Dy*cos%28%5Cvarphi%29&plus;_%7B%28M%29%7Dy_%7BQualisys%2Cbase%7D)
 
 Using the least_squares optimization method, six results for phi will be calculated, each with three x and y coordinates.
 
