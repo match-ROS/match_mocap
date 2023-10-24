@@ -50,22 +50,18 @@ class node():
         # Initialize the subscriber
         rospy.Subscriber(self.robot_pose_topic_mocap, PoseStamped, self.callback)
         
+        
+        
         # Set the limits of the plot 
         # !!!
         # Need to be changed depending on the position of the robot
         # Use the log messages to find the right values (line 81)
         # !!!
-        self.ax.set_xlim(-5.2, -4.9)
-        self.ax.set_ylim(-1.5, -1.2)
-        self.anim = FuncAnimation(self.fig, self.update_plot, interval=10, blit=True, cache_frame_data=False)
-        plt.show()
+        # self.ax.set_xlim(-5.2, -4.9)
+        # self.ax.set_ylim(-1.5, -1.2)
         rospy.spin()
 
     def run(self):
-        
-        # wait for localization from mocap
-        rospy.wait_for_message(self.robot_pose_topic_mocap, PoseStamped)
-        
         # Set the target orientation to 1.9 * pi radians
         if self.target_orientation is None:
             rot = transformations.quaternion_about_axis(1.9 * math.pi, (0,0,1))
@@ -141,6 +137,11 @@ class node():
 
         rospy.loginfo("Radius of circle: %s", sum(radius)/len(radius))
 
+        # Plot the circle
+        self.ax.autoscale(enable=True, axis='both', tight=True)
+        self.anim = FuncAnimation(self.fig, self.update_plot, interval=10, blit=True, cache_frame_data=False)
+        plt.show()
+
         # Shutdown the node
         rospy.signal_shutdown("Shutting down")
 
@@ -148,4 +149,4 @@ class node():
 
 if __name__ == '__main__':
     Node = node()
-    Node.run()
+    #Node.run()
