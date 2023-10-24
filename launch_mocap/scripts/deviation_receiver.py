@@ -8,7 +8,7 @@ The radius of the circle is calculated by taking the average of the distance bet
 
 from matplotlib.animation import FuncAnimation
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from geometry_msgs.msg import Twist
 from tf import transformations
 import math
@@ -28,7 +28,7 @@ class node():
     stop = False
 
     # Starting pose and current pose of the robot
-    starting_pose = PoseStamped()
+    starting_pose = Pose()
     current_pose = PoseStamped()
     target_orientation = None
     
@@ -36,13 +36,17 @@ class node():
     fig, ax = plt.subplots()
     line, = ax.plot([], [], 'o-')
 
+    def config(self):
+        self.robot_pose_topic_mocap = "/qualisys/mur620a/pose"
+        self.cmd_vel_topic = "/cmd_vel"
+
     # Constructor which initializes the node and the publisher, the subscriber and the animation
     def __init__(self):
         # Initialize the publisher
         rospy.init_node('data_receiver', anonymous=True)
-        self.pub = rospy.Publisher("/mur620c/mir/cmd_vel", Twist, queue_size=1)
+        self.pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=1)
         # Initialize the subscriber
-        rospy.Subscriber("/qualisys/mur620c/pose", PoseStamped, self.callback)
+        rospy.Subscriber(self.robot_pose_topic_mocap, PoseStamped, self.callback)
         
         # Set the limits of the plot 
         # !!!
@@ -56,6 +60,10 @@ class node():
         rospy.spin()
 
     def run(self):
+        
+        # wait for localization from mocap
+        rospy.wait_for_message(self.robot_pose_topic_mocap, PoseStamped)
+        
         # Set the target orientation to 1.9 * pi radians
         if self.target_orientation is None:
             rot = transformations.quaternion_about_axis(1.9 * math.pi, (0,0,1))
