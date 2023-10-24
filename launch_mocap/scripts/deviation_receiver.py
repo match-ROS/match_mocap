@@ -42,6 +42,8 @@ class node():
 
     # Constructor which initializes the node and the publisher, the subscriber and the animation
     def __init__(self):
+        # load config
+        self.config()
         # Initialize the publisher
         rospy.init_node('data_receiver', anonymous=True)
         self.pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=1)
