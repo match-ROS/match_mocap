@@ -8,7 +8,7 @@ The radius of the circle is calculated by taking the average of the distance bet
 
 from matplotlib.animation import FuncAnimation
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from geometry_msgs.msg import Twist
 from tf import transformations
 import math
@@ -28,7 +28,7 @@ class node():
     stop = False
 
     # Starting pose and current pose of the robot
-    starting_pose = PoseStamped()
+    starting_pose = Pose()
     current_pose = PoseStamped()
     target_orientation = None
     
@@ -36,23 +36,29 @@ class node():
     fig, ax = plt.subplots()
     line, = ax.plot([], [], 'o-')
 
+    def config(self):
+        self.robot_pose_topic_mocap = "/qualisys/mur620a/pose"
+        self.cmd_vel_topic = "/cmd_vel"
+
     # Constructor which initializes the node and the publisher, the subscriber and the animation
     def __init__(self):
+        # load config
+        self.config()
         # Initialize the publisher
         rospy.init_node('data_receiver', anonymous=True)
-        self.pub = rospy.Publisher("/mur620c/mir/cmd_vel", Twist, queue_size=1)
+        self.pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=1)
         # Initialize the subscriber
-        rospy.Subscriber("/qualisys/mur620c/pose", PoseStamped, self.callback)
+        rospy.Subscriber(self.robot_pose_topic_mocap, PoseStamped, self.callback)
+        
+        
         
         # Set the limits of the plot 
         # !!!
         # Need to be changed depending on the position of the robot
         # Use the log messages to find the right values (line 81)
         # !!!
-        self.ax.set_xlim(-5.2, -4.9)
-        self.ax.set_ylim(-1.5, -1.2)
-        self.anim = FuncAnimation(self.fig, self.update_plot, interval=10, blit=True, cache_frame_data=False)
-        plt.show()
+        # self.ax.set_xlim(-5.2, -4.9)
+        # self.ax.set_ylim(-1.5, -1.2)
         rospy.spin()
 
     def run(self):
@@ -131,6 +137,11 @@ class node():
 
         rospy.loginfo("Radius of circle: %s", sum(radius)/len(radius))
 
+        # Plot the circle
+        self.ax.autoscale(enable=True, axis='both', tight=True)
+        self.anim = FuncAnimation(self.fig, self.update_plot, interval=10, blit=True, cache_frame_data=False)
+        plt.show()
+
         # Shutdown the node
         rospy.signal_shutdown("Shutting down")
 
@@ -138,4 +149,4 @@ class node():
 
 if __name__ == '__main__':
     Node = node()
-    Node.run()
+    #Node.run()
