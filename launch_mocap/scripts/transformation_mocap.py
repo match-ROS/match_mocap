@@ -5,7 +5,6 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Pose, TransformStamped
 import tf
 import tf2_geometry_msgs.tf2_geometry_msgs
-from geometry_msgs.msg import PoseStamped, Pose
 
 # Python
 import numpy as np
@@ -166,6 +165,7 @@ class Main():
     y_list = []
     ksbase_list = []
     list_transformations = []
+    offset_list = []
 
     i = 0
 
@@ -190,15 +190,22 @@ class Main():
         # Calculate the offset between the transformed Qualisys point and the MIR point
         x_offset = point_transformed.pose.position.x - point_mir.position.x
         y_offset = point_transformed.pose.position.y - point_mir.position.y
-
+        yaw_offset = point_transformed.pose.orientation.z - point_mir.orientation.z
+        good = False
         # Check if the offset is small enough
         if ( x_offset < 0.01 and x_offset > -0.01):
-            if ( y_offset < 0.01 and y_offset > -0.01) and trans_c > 0 and trans_c < math.pi:
-                rospy.loginfo("Found good transformation! x:%s y:%s phi:%s", trans_x, trans_y, trans_c)
-                self.list_transformations.append(transformation)
-                rospy.loginfo("Current good transformations: %s", len(self.list_transformations))
+            if ( y_offset < 0.01 and y_offset > -0.01):
+                if ( yaw_offset < 0.01 and yaw_offset > -0.01) and trans_c > 0 and trans_c < math.pi:
+                    rospy.loginfo("Found good transformation! x:%s y:%s phi:%s", trans_x, trans_y, trans_c)
+                    rospy.loginfo("Offset: x:%s y:%s phi:%s", x_offset, y_offset, yaw_offset)
+                    self.list_transformations.append(transformation)
+                    self.offset_list.append([x_offset, y_offset, yaw_offset])
+                    rospy.loginfo("Current good transformations: %s", len(self.list_transformations))
+                    b = True
+        if good is False:
+            rospy.loginfo("Transformation was bad! %s %s %s %s", x_offset, y_offset, yaw_offset, str(len(self.list_transformations)))
         # If we have 200 good transformations, calculate the median of the results and stop the node
-        if len(self.list_transformations) == 200:
+        if len(self.list_transformations) == 50:
             x_list = []
             y_list = []
             c_list = []
@@ -209,50 +216,64 @@ class Main():
                 explicit_quat = [trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w]
                 roll, pitch, yaw = tf.transformations.euler_from_quaternion(explicit_quat)
                 c_list.append(yaw)
-            rospy.loginfo("---------------------------------")
-            rospy.loginfo("Reached 200 good transformations!")
+            i = 0
+            # Print all transformations
+            while i < len(self.list_transformations):
+                rospy.loginfo("Transformation %s", i)
+                rospy.loginfo("x: %s", x_list[i])
+                rospy.loginfo("y: %s", y_list[i])
+                rospy.loginfo("phi: %s", c_list[i])
+                i = i + 1
+                
+            lowest_offset_index = min(range(len(self.offset_list)), key=lambda i: abs(self.offset_list[i][0]) + abs(self.offset_list[i][1]) + abs(self.offset_list[i][2]))
+            
+            rospy.loginfo("-!---------------------------------!-")
+            rospy.loginfo("Reached 50 good transformations!")
+            rospy.logininfo("")
+            rospy.loginfo("Median: ")
             rospy.loginfo("x: %s", st.median(x_list))
             rospy.loginfo("y: %s", st.median(y_list))
             rospy.loginfo("phi: %s rad", st.median(c_list))
-            rospy.loginfo("---------------------------------")
-            rospy.signal_shutdown("END!")
+            rospy.loginfo("")
+            rospy.loginfo("Lowest offset: ")
+            rospy.loginfo("x: %s", x_list[lowest_offset_index])
+            rospy.loginfo("y: %s", y_list[lowest_offset_index])
+            rospy.loginfo("phi: %s rad", c_list[lowest_offset_index])
+            rospy.loginfo("-!---------------------------------!-")
             self.b = False
-
+            #rospy.signal_shutdown("END!")
             # Direct broadcast. Can be used if needed
-            """
             trans_median = TransformStamped()
             trans_median.header.stamp = rospy.Time.now()
             trans_median.header.frame_id = "map"
             trans_median.child_frame_id = "mocap"
-            trans_median.transform.translation.x = st.median(x_list)
-            trans_median.transform.translation.y = st.median(y_list)
+            trans_median.transform.translation.x = x_list[lowest_offset_index]
+            trans_median.transform.translation.y = y_list[lowest_offset_index]
             trans_median.transform.translation.z = 0.0
-            q = tf.transformations.quaternion_from_euler(0, 0, st.median(c_list))
+            q = tf.transformations.quaternion_from_euler(0, 0, c_list[lowest_offset_index])
             trans_median.transform.rotation.x = q[0]
             trans_median.transform.rotation.y = q[1]
             trans_median.transform.rotation.z = q[2]
             trans_median.transform.rotation.w = q[3]
             self.broadcaster(trans_median)
-            """
+            
 
-    # Function for direct broadcasting. Not used in this version
     def broadcaster(self, trans):
-        bc = tf.TransformBroadcaster()
-        translation = (
-        trans.transform.translation.x,
-        trans.transform.translation.y,
-        trans.transform.translation.z
-        )
-        rotation = (
-            trans.transform.rotation.x,
-            trans.transform.rotation.y,
-            trans.transform.rotation.z,
-            trans.transform.rotation.w
-        )
         while rospy.is_shutdown() is False:
+            bc = tf.TransformBroadcaster()
+            translation = (
+                trans.transform.translation.x,
+                trans.transform.translation.y,
+                trans.transform.translation.z
+            )
+            rotation = (
+                trans.transform.rotation.x,
+                trans.transform.rotation.y,
+                trans.transform.rotation.z,
+                trans.transform.rotation.w
+            )
             bc.sendTransform(translation, rotation, rospy.Time.now(), "mocap", "map")
             self.rate.sleep()
-        rospy.signal_shutdown("END!")
 
     # Function which handles the data from the topics
     def process_data(self, topic1_data, topic2_data):
@@ -298,10 +319,10 @@ class Main():
     # init function
     # will activate the node and subscribe to the topics
     def __init__(self):
-        rospy.sleep(1)
         rospy.init_node('coordinate_transformer', anonymous=True)
-        rospy.Subscriber("/qualisys/mur620c/pose", PoseStamped, self.callback_1)
-        rospy.Subscriber("/mur620c/mir/robot_pose", Pose, self.callback_2)
+        rospy.loginfo("Start")
+        rospy.Subscriber("/qualisys/mur620b/pose", PoseStamped, self.callback_1)
+        rospy.Subscriber("/mur620b/robot_pose", Pose, self.callback_2)
         self.rate = rospy.Rate(10)
         rospy.spin()
     
