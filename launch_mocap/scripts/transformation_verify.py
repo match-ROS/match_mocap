@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+#Test Script to verify the transformation between the Qualisys and the MIR
+#!!!Work in progress
+
 import rospy
 from geometry_msgs.msg import PoseStamped, Pose
 import tf2_ros
