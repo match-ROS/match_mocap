@@ -1,5 +1,4 @@
 <launch>
     <rosparam file="$(find launch_mocap)/config/transformation_mocap.yaml" command="load"/>
     <node name="transformation_mocap" pkg="launch_mocap" type="transformation_mocap.py" output="screen"/>
-
 </launch>

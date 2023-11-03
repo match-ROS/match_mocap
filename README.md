@@ -42,3 +42,7 @@ The determined transformation matrix is then checked with the known values. If t
 
 #### - Usage
 The MIR platform must move along a path while the Node is running. Excecuting the node will continously calculate transformation matrices and decide if they are accurate enough. After 200 good transformations, the node will stop and publish the median transformation to the terminal.
+
+### - Config
+
+good_tranformations
