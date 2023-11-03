@@ -9,6 +9,7 @@ import tf2_geometry_msgs.tf2_geometry_msgs
 # Python
 import numpy as np
 import math
+import json
 
 # Scipy
 import statistics as st
@@ -117,7 +118,6 @@ class Q2M_Transformer:
             return None, None, None
         
         # !Now the calculation of the angle phi starts
-        # Define the lists for the results
         result_x = []
         result_y = []
         i = 0
@@ -204,8 +204,8 @@ class Main():
                     b = True
         if good is False:
             rospy.loginfo("Transformation was bad! %s %s %s %s", x_offset, y_offset, yaw_offset, str(len(self.list_transformations)))
-        # If we have 200 good transformations, calculate the median of the results and stop the node
-        if len(self.list_transformations) == 50:
+        # If we have x good transformations, calculate the median of the results and stop the node, x is configured in the config file
+        if len(self.list_transformations) == self.good_tranformations:
             x_list = []
             y_list = []
             c_list = []
@@ -217,18 +217,20 @@ class Main():
                 roll, pitch, yaw = tf.transformations.euler_from_quaternion(explicit_quat)
                 c_list.append(yaw)
             i = 0
-            # Print all transformations
-            while i < len(self.list_transformations):
-                rospy.loginfo("Transformation %s", i)
-                rospy.loginfo("x: %s", x_list[i])
-                rospy.loginfo("y: %s", y_list[i])
-                rospy.loginfo("phi: %s", c_list[i])
-                i = i + 1
-                
+
+            if self.print_transformation is True:
+                while i < len(self.list_transformations):
+                    rospy.loginfo("Transformation %s", i)
+                    rospy.loginfo("x: %s", x_list[i])
+                    rospy.loginfo("y: %s", y_list[i])
+                    rospy.loginfo("phi: %s", c_list[i])
+                    i = i + 1
+            
+            # Find the transformation with the lowest offset
             lowest_offset_index = min(range(len(self.offset_list)), key=lambda i: abs(self.offset_list[i][0]) + abs(self.offset_list[i][1]) + abs(self.offset_list[i][2]))
             
             rospy.loginfo("-!---------------------------------!-")
-            rospy.loginfo("Reached 50 good transformations!")
+            rospy.loginfo("Reached %s good transformations!")
             rospy.logininfo("")
             rospy.loginfo("Median: ")
             rospy.loginfo("x: %s", st.median(x_list))
@@ -241,21 +243,29 @@ class Main():
             rospy.loginfo("phi: %s rad", c_list[lowest_offset_index])
             rospy.loginfo("-!---------------------------------!-")
             self.b = False
-            #rospy.signal_shutdown("END!")
-            # Direct broadcast. Can be used if needed
             trans_median = TransformStamped()
             trans_median.header.stamp = rospy.Time.now()
             trans_median.header.frame_id = "map"
             trans_median.child_frame_id = "mocap"
-            trans_median.transform.translation.x = x_list[lowest_offset_index]
-            trans_median.transform.translation.y = y_list[lowest_offset_index]
+            if(self.use_median is False):
+                trans_median.transform.translation.x = x_list[lowest_offset_index]
+                trans_median.transform.translation.y = y_list[lowest_offset_index]
+                q = tf.transformations.quaternion_from_euler(0, 0, c_list[lowest_offset_index])
+            else:
+                trans_median.transform.translation.x = st.median(x_list)
+                trans_median.transform.translation.y = st.median(y_list)
+                q = tf.transformations.quaternion_from_euler(0, 0, st.median(c_list))
+            
             trans_median.transform.translation.z = 0.0
-            q = tf.transformations.quaternion_from_euler(0, 0, c_list[lowest_offset_index])
             trans_median.transform.rotation.x = q[0]
             trans_median.transform.rotation.y = q[1]
             trans_median.transform.rotation.z = q[2]
             trans_median.transform.rotation.w = q[3]
-            self.broadcaster(trans_median)
+            if self.publish_transformation is True:
+                self.broadcaster(trans_median)
+            else:
+                rospy.signal_shutdown("END!")
+
             
 
     def broadcaster(self, trans):
@@ -315,14 +325,24 @@ class Main():
         # Because the topics are not synchronized, we use the slowest topic as a trigger for the procedure
         if self.i < 3:
             self.process_data(self.topic1_data, self.topic2_data)
+            
+    def load_config(self, path):
+        with open(path, 'r') as config:#
+            return json.load(config)
 
     # init function
     # will activate the node and subscribe to the topics
     def __init__(self):
-        rospy.init_node('coordinate_transformer', anonymous=True)
+        rospy.init_node('transformation_mocap', anonymous=True)
         rospy.loginfo("Start")
-        rospy.Subscriber("/qualisys/mur620b/pose", PoseStamped, self.callback_1)
-        rospy.Subscriber("/mur620b/robot_pose", Pose, self.callback_2)
+        self.publish_transformation = rospy.get_param("/general_parameters/publish_transformation", False)
+        self.use_median = rospy.get_param("/general_parameters/use_median", False)
+        self.good_tranformations = rospy.get_param("/general_parameters/good_transformations", 50)
+        self.print_transformation = rospy.get_param("/general_parameters/print_all_transformations", False)
+        self.qualisys_topic = rospy.get_param("/general_parameters/qualisys_topic", "/qualisys/mur620b/pose")
+        self.mir_topic = rospy.get_param("/general_parameters/mir_topic", "/mur620b/robot_pose")
+        rospy.Subscriber(self.qualisys_topic, PoseStamped, self.callback_1)
+        rospy.Subscriber(self.mir_topic, Pose, self.callback_2)
         self.rate = rospy.Rate(10)
         rospy.spin()
     
