@@ -18,12 +18,16 @@ class AngleCalibration():
         
         
     def config(self):
-        self.robot_pose_topic_mocap = "/qualisys/mur620a/pose"
-        self.cmd_vel_topic = "/mur620a/cmd_vel"
+        self.robot_pose_topic_mocap = "/qualisys/mur620c/pose"
+        self.cmd_vel_topic = "/mur620c/cmd_vel"
         self.duration = 10
         self.velocity = 0.1
     
     def run(self):
+        # wait until the mocap pose is available
+        while not rospy.is_shutdown() and not hasattr(self, 'mocap_pose'):
+            rospy.sleep(0.1)
+        
         # store inital position
         self.initial_position = deepcopy(self.mocap_pose)
         
