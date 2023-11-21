@@ -42,3 +42,9 @@ The determined transformation matrix is then checked with the known values. If t
 
 #### - Usage
 The MIR platform must move along a path while the Node is running. Excecuting the node will continously calculate transformation matrices and decide if they are accurate enough. After 200 good transformations, the node will stop and publish the median transformation to the terminal.
+
+#### - Config
+- good_transformations: How many transformations should be calculated within the tolerance
+- publish_transformation: If the transformation should be published after the the script between mocap and map
+- use_median: Use the median of all good transformations instead of the with the lowest offset between transformated mocap and map coordinates
+- print_all_transformations: If all good transformations should be printed at the end of the script
