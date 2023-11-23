@@ -30,7 +30,7 @@ class node():
     line, = ax.plot([], [], 'o-')
 
     def config(self):
-        self.robot_pose_topic_mocap = "/qualisys/mur620a/pose"
+        self.robot_pose_topic_mocap = "/qualisys/mur620d/pose"
         self.cmd_vel_topic = "/cmd_vel"
 
     # Constructor which initializes the node and the publisher, the subscriber and the animation
@@ -44,25 +44,28 @@ class node():
     def run(self):
         # Set the target orientation to 1.9 * pi radians because a whole rotation can cause problems with the calculation of the radius 
         if self.target_orientation is None:
-            rot = transformations.quaternion_about_axis(1.9 * math.pi, (0,0,1))
+            rot = transformations.quaternion_about_axis(2.2 * math.pi, (0,0,1))
             q = [self.starting_pose.orientation.x, self.starting_pose.orientation.y, self.starting_pose.orientation.z, self.starting_pose.orientation.w]
             q_target = transformations.quaternion_multiply(q, rot)
-            self.target_orientation = transformations.euler_from_quaternion(q_target)
-            rospy.loginfo("Target orientation: %s", self.target_orientation)
+            self.target_orientation = transformations.euler_from_quaternion(q)[2] - 0.1
+            #rospy.loginfo("Target orientation: %s", self.target_orientation)
 
         # Rotate the robot around its z axis until it reaches the target orientation
         # self.start is True when the robot has received its first pose
         # self.stop is set to True when the robot has reached the target orientation
+        
         if self.start is True and hasattr(self.current_pose, 'orientation') :
             current_orientation = transformations.euler_from_quaternion([self.current_pose.orientation.x, self.current_pose.orientation.y, self.current_pose.orientation.z, self.current_pose.orientation.w])
-            if abs(current_orientation[2] - self.target_orientation[2]) > 0.1:
+            print("current orientation", current_orientation)
+            print("target orientation", self.target_orientation)
+            if abs(current_orientation[2] - self.target_orientation) > 0.05:
                 twist = Twist()
                 twist.angular.z = 0.1
                 self.pub.publish(twist)
                 rospy.loginfo("%s %s", self.current_pose.position.x, self.current_pose.position.y)
                 self.x_data.append(self.current_pose.position.x)
                 self.y_data.append(self.current_pose.position.y)
-                self.update_plot(None)
+                #self.update_plot(None)
             else:             # Stop the robot and start to calculate the radius of the circle
                 twist = Twist()
                 twist.linear.x = 0.0
