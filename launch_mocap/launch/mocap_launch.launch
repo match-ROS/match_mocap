@@ -5,4 +5,8 @@
      <arg name="server_address" value="QTM"/>
 </include>
 
+<!-- launch tf static transform publisher -->
+<node pkg="tf2_ros" type="static_transform_publisher" name="map_to_mocap" args="38.501 32.85 0 3.1188 0 0 map mocap 100" />
+
+
 </launch>
