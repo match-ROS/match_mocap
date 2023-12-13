@@ -1,8 +1,12 @@
 <launch>
 
+<arg name="server_address" default="QTM"/>
+<arg name="publish_tf" default="true"/>
+
 <!-- launch qualisys launch file -->
 <include file="$(find mocap_qualisys)/launch/qualisys.launch">
-     <arg name="server_address" value="QTM"/>
+     <arg name="server_address" value="$(arg server_address)"/>
+     <arg name="publish_tf" value="$(arg publish_tf)"/>
 </include>
 
 <!-- launch tf static transform publisher -->
