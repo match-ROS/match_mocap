@@ -1,4 +1,4 @@
-# Project Title
+# Mocap Toolbox
 
 ## Table of Contents
 
@@ -20,3 +20,8 @@ This section explains the different scripts in this package and how to use them.
 
 ### mocap_transformer.py
 Transforms mocap poses to map frame (from mocap/* to mocap_map/*). Could also be used as a base class in an other python script.
+Run via:
+
+```bash
+rosrun mocap_toolbox mocap_transformer.py 
+```

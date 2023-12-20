@@ -11,6 +11,9 @@ class MocapTransformerNode:
         """Transforms mocap poses to map frame (from mocap/* to mocap_map/*)"""
         rospy.init_node('mocap_transformer_node', anonymous=True)
 
+        #  Get params:
+        self.target_frame = rospy.get_param("~target_frame", "map")
+
         self.tf_listener = tf.TransformListener()
         # Subscribe to PoseStamped topics under /mocap/*
         self.mocap_subscribers = {}
@@ -22,7 +25,7 @@ class MocapTransformerNode:
         # Define a callback function for each mocap topic
         for topic in self.mocap_topics:
             self.mocap_publishers[topic] = rospy.Publisher(
-                f'/qualisys_map/{topic}', PoseStamped, queue_size=10
+                f'/qualisys_{self.target_frame}/{topic}', PoseStamped, queue_size=10
             )
             
             self.mocap_subscribers[topic] = rospy.Subscriber(
@@ -52,13 +55,13 @@ class MocapTransformerNode:
     def mocap_callback(self, pose_stamped, topic):
         try:            
             # Transform the pose
-            transformed_pose = self.tf_listener.transformPose("map", pose_stamped)
+            transformed_pose = self.tf_listener.transformPose(self.target_frame, pose_stamped)
 
             # Publish the transformed pose on /mocap_map/*
             self.mocap_publishers[topic].publish(transformed_pose)
             
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
-            rospy.logwarn_throttle(1, f"Transform lookup failed for {topic} ({pose_stamped.header.frame_id} to map): {e}")
+            rospy.logwarn_throttle(1, f"Transform lookup failed for {topic} ({pose_stamped.header.frame_id} to {self.target_frame}): {e}")
 
 if __name__ == '__main__':
     try:
