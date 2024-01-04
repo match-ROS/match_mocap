@@ -10,7 +10,7 @@
 </include>
 
 <!-- launch tf static transform publisher -->
-<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="38.2691 32.8942 0 3.1206 0 0 map mocap 1" />
+<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="38.2691 32.8942 0 3.1656 0 0 map mocap 1" />
 
 
 <node pkg="mocap_toolbox" type="mocap_transformer.py" name="mocap_map_transformer" output="screen">
