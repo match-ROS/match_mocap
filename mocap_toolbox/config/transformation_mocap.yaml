@@ -1,7 +1,6 @@
-general_parameters:
-    qualisys_topic: /qualisys/mur620b/pose
-    mir_topic: /mur620b/robot_pose
-    good_tranformations: 50
-    publish_transformation: false
-    use_median: false
-    print_all_transformations: false
+robot_pose_mocap_topic: /qualisys/mur620d/pose
+robot_pose_map_topic: /mur620d/robot_pose
+odom_topic: /mur620d/odom
+minimum_pose_pairs: 10
+velocity_threshold_linear: 0.1
+velocity_threshold_angular: 0.1
