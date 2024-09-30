@@ -1,0 +1,4 @@
+<launch>
+    <rosparam file="$(find mocap_toolbox)/config/transformation_mocap_circle.yaml" command="load"/>
+    <node name="transformation_mocap" pkg="mocap_toolbox" type="transformation_mocap_circle.py" output="screen"/>
+</launch>

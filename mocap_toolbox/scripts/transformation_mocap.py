@@ -1,351 +1,213 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-# ROS
 import rospy
-from geometry_msgs.msg import PoseStamped, Pose, TransformStamped
 import tf
-import tf2_geometry_msgs.tf2_geometry_msgs
-
-# Python
 import numpy as np
-import math
-import json
+from geometry_msgs.msg import PoseStamped, Pose
+from nav_msgs.msg import Odometry
+from threading import Lock
+from tf.transformations import quaternion_matrix, quaternion_from_matrix
+from std_srvs.srv import Empty, EmptyResponse
 
-# Scipy
-import statistics as st
-from scipy.optimize import least_squares
-
-
-class Q2M_Transformer:
-
-    # Function to calculate the intersection of two circles
-    def get_intersections(self, x0, y0, r0, x1, y1, r1):
-        d=math.sqrt((x1-x0)**2 + (y1-y0)**2)
-        
-        if d > r0 + r1 :
-            return None
-
-        if d < abs(r0-r1):
-            return None
-
-        if d == 0 and r0 == r1:
-            return None
-
-        else:
-            a=(r0**2-r1**2+d**2)/(2*d)
-            h=math.sqrt(r0**2-a**2)
-            x2=x0+a*(x1-x0)/d   
-            y2=y0+a*(y1-y0)/d   
-            x3=x2+h*(y1-y0)/d     
-            y3=y2-h*(x1-x0)/d 
-
-            x4=x2-h*(y1-y0)/d
-            y4=y2+h*(x1-x0)/d
-            
-            return (x3, y3, x4, y4)
-
-    # Functions which are used for least squares optimization 
-    # See Readme for more information
-    def func_x(self, phi, ks_base_x, x1, y1, sol):
-        return ks_base_x + x1 * np.cos(phi) - y1 * np.sin(phi) - sol
-
-    def func_y(self, phi, ks_base_y, x1, y1, sol):
-        return ks_base_y + x1 * np.sin(phi) + y1 * np.cos(phi) - sol
-
-    # Main function
-    # ps_q: PoseStamped from Qualisys
-    # p_m: Pose from MIR
-    # Returns: two lists with the results for phi and the base of the Qualisys coordinate system in mir coordinates
-    def main(self, ps_q, p_m):
-        points_qualisys = []
-        points_mir = []
-        # [ q_x, q_y, r]
-        circles = []
-
-        # Transform coordinates from PoseStamped and Pose to list
-        for point_q in ps_q:
-            x = float(point_q.pose.position.x)
-            y = float(point_q.pose.position.y)
-            points_qualisys.append([x, y])
-
-        for point_m in p_m:
-            x = float(point_m.position.x)
-            y = float(point_m.position.y)
-            points_mir.append([x, y])
-
-        # ! Now the calculation of the base starts
-        # Calculate the radius of the circles with the Qualisys coordinates
-        i = 0
-        while i < len(points_qualisys):
-            qualisys_x = points_qualisys[i][0]
-            qualisys_y = points_qualisys[i][1]
-            radius = math.sqrt( math.pow(qualisys_x, 2) + math.pow(qualisys_y, 2))
-            
-            mir_x = points_mir[i][0]
-            mir_y = points_mir[i][1]
-            
-            circles.append([mir_x, mir_y, radius])
-
-            i = i + 1
-
-        # intersection_1 and intersection_2 are lists with the intersection points of the circles
-        intersection_1 = []
-        intersection_2 = []
-        KS_Base = []
-        
-        # Calculate the intersection points of the circles and checks if there are two intersections
-        i1 = self.get_intersections(circles[0][0], circles[0][1], circles[0][2], circles[1][0], circles[1][1], circles[1][2])
-        if i1 is not None:
-            intersection_1.extend(i1)
-        else:
-            rospy.loginfo("No intersecting circles")
-            return None, None, None
-        i2 = self.get_intersections(circles[1][0], circles[1][1], circles[1][2], circles[2][0], circles[2][1], circles[2][2])
-        if i2 is not None:
-            intersection_2.extend(i2)
-        else:
-            rospy.loginfo("No intersecting circles")
-            return None, None, None
-
-        # Trys to find the two intersection points which are mostly the same
-        for point1 in intersection_1:
-            for point2 in intersection_2:
-                if (point1 - point2) < 1 and (point1 - point2) > -1 and len(KS_Base) < 2:
-                    KS_Base.append(np.mean([point1, point2]))
-
-        if len(KS_Base) != 2:
-            rospy.loginfo("No Base")
-            return None, None, None
-        
-        # !Now the calculation of the angle phi starts
-        result_x = []
-        result_y = []
-        i = 0
-        # For each point calculate the angle phi
-        while i < len(points_qualisys):
-            qualisys_x = points_qualisys[i][0]
-            qualisys_y = points_qualisys[i][1]
-            mir_x = points_mir[i][0]
-            mir_y = points_mir[i][1]
-            # Calculate the angle phi with least squares optimization
-            # The function func_x and func_y are used for the optimization
-            # See Readme for more information
-            result1 = least_squares(self.func_x, 1, args=(KS_Base[0], qualisys_x, qualisys_y, mir_x))
-            result2 = least_squares(self.func_y, 1, args=(KS_Base[1], qualisys_x, qualisys_y, mir_y))
-            # Check if the results are valid
-            if len(result1.x) != 0:
-                result_x.append(result1.x[0])
-            else:
-                rospy.loginfo("No result for x-coordinates")
-                return None, None, None
-            if len(result2.x) != 0:
-                result_y.append(result2.x[0])
-            else:
-                rospy.loginfo("No result for y-coordinates")
-                return None, None, None
-            i = i +1 
-        # Return the results
-        return result_x, result_y, KS_Base
-    
-# Main class for the node
-class Main():
-
-    # topic1: Topic for the Qualisys data
-    # topic2: Topic for the MIR data
-    topic1_data = None
-    topic2_data = None
-
-    b = True
-    rate = None
-
-    point_q_arr = []
-    point_m_arr = []
-
-    xy_list = []
-    y_list = []
-    ksbase_list = []
-    list_transformations = []
-    offset_list = []
-
-    i = 0
-
-    def transform_point(self, point_qualisys, point_mir, trans_x, trans_y, trans_c):
-        # Create a transformation from the results of the calculation
-        transformation = TransformStamped()
-        transformation.header.stamp = rospy.Time.now()
-        transformation.header.frame_id = "map"
-        transformation.child_frame_id = str(len(self.list_transformations) + 1)
-        transformation.transform.translation.x = trans_x
-        transformation.transform.translation.y = trans_y
-        transformation.transform.translation.z = 0.0
-        q = tf.transformations.quaternion_from_euler(0, 0, trans_c)
-        transformation.transform.rotation.x = q[0]
-        transformation.transform.rotation.y = q[1]
-        transformation.transform.rotation.z = q[2]
-        transformation.transform.rotation.w = q[3]
-
-        # Transform the Qualisys point with the calculated transformation
-        point_transformed = tf2_geometry_msgs.do_transform_pose(point_qualisys, transformation)
-
-        # Calculate the offset between the transformed Qualisys point and the MIR point
-        x_offset = point_transformed.pose.position.x - point_mir.position.x
-        y_offset = point_transformed.pose.position.y - point_mir.position.y
-        yaw_offset = point_transformed.pose.orientation.z - point_mir.orientation.z
-        good = False
-        # Check if the offset is small enough
-        if ( x_offset < 0.01 and x_offset > -0.01):
-            if ( y_offset < 0.01 and y_offset > -0.01):
-                if ( yaw_offset < 0.01 and yaw_offset > -0.01) and trans_c > 0 and trans_c < math.pi:
-                    rospy.loginfo("Found good transformation! x:%s y:%s phi:%s", trans_x, trans_y, trans_c)
-                    rospy.loginfo("Offset: x:%s y:%s phi:%s", x_offset, y_offset, yaw_offset)
-                    self.list_transformations.append(transformation)
-                    self.offset_list.append([x_offset, y_offset, yaw_offset])
-                    rospy.loginfo("Current good transformations: %s", len(self.list_transformations))
-                    b = True
-        if good is False:
-            rospy.loginfo("Transformation was bad! %s %s %s %s", x_offset, y_offset, yaw_offset, str(len(self.list_transformations)))
-        # If we have x good transformations, calculate the median of the results and stop the node, x is configured in the config file
-        if len(self.list_transformations) == self.good_tranformations:
-            x_list = []
-            y_list = []
-            c_list = []
-            for trans in self.list_transformations:
-                x_list.append(trans.transform.translation.x)
-                y_list.append(trans.transform.translation.y)
-                # Calculate the euler angles from the quaternion
-                explicit_quat = [trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w]
-                roll, pitch, yaw = tf.transformations.euler_from_quaternion(explicit_quat)
-                c_list.append(yaw)
-            i = 0
-
-            if self.print_transformation is True:
-                while i < len(self.list_transformations):
-                    rospy.loginfo("Transformation %s", i)
-                    rospy.loginfo("x: %s", x_list[i])
-                    rospy.loginfo("y: %s", y_list[i])
-                    rospy.loginfo("phi: %s", c_list[i])
-                    i = i + 1
-            
-            # Find the transformation with the lowest offset
-            lowest_offset_index = min(range(len(self.offset_list)), key=lambda i: abs(self.offset_list[i][0]) + abs(self.offset_list[i][1]) + abs(self.offset_list[i][2]))
-            
-            rospy.loginfo("-!---------------------------------!-")
-            rospy.loginfo("Reached %s good transformations!")
-            rospy.loginfo("")
-            rospy.loginfo("Median: ")
-            rospy.loginfo("x: %s", st.median(x_list))
-            rospy.loginfo("y: %s", st.median(y_list))
-            rospy.loginfo("phi: %s rad", st.median(c_list))
-            rospy.loginfo("")
-            rospy.loginfo("Lowest offset: ")
-            rospy.loginfo("x: %s", x_list[lowest_offset_index])
-            rospy.loginfo("y: %s", y_list[lowest_offset_index])
-            rospy.loginfo("phi: %s rad", c_list[lowest_offset_index])
-            rospy.loginfo("-!---------------------------------!-")
-            self.b = False
-            trans_median = TransformStamped()
-            trans_median.header.stamp = rospy.Time.now()
-            trans_median.header.frame_id = "map"
-            trans_median.child_frame_id = "mocap"
-            if(self.use_median is False):
-                trans_median.transform.translation.x = x_list[lowest_offset_index]
-                trans_median.transform.translation.y = y_list[lowest_offset_index]
-                q = tf.transformations.quaternion_from_euler(0, 0, c_list[lowest_offset_index])
-            else:
-                trans_median.transform.translation.x = st.median(x_list)
-                trans_median.transform.translation.y = st.median(y_list)
-                q = tf.transformations.quaternion_from_euler(0, 0, st.median(c_list))
-            
-            trans_median.transform.translation.z = 0.0
-            trans_median.transform.rotation.x = q[0]
-            trans_median.transform.rotation.y = q[1]
-            trans_median.transform.rotation.z = q[2]
-            trans_median.transform.rotation.w = q[3]
-            if self.publish_transformation is True:
-                self.broadcaster(trans_median)
-            else:
-                rospy.signal_shutdown("END!")
-
-            
-
-    def broadcaster(self, trans):
-        while rospy.is_shutdown() is False:
-            bc = tf.TransformBroadcaster()
-            translation = (
-                trans.transform.translation.x,
-                trans.transform.translation.y,
-                trans.transform.translation.z
-            )
-            rotation = (
-                trans.transform.rotation.x,
-                trans.transform.rotation.y,
-                trans.transform.rotation.z,
-                trans.transform.rotation.w
-            )
-            bc.sendTransform(translation, rotation, rospy.Time.now(), "mocap", "map")
-            self.rate.sleep()
-
-    # Function which handles the data from the topics
-    def process_data(self, topic1_data, topic2_data):
-        # Check if the data is not None and we still need to find the transformation
-        if topic1_data is not None and topic2_data is not None and self.b is True:
-            self.point_q_arr.append(topic1_data)
-            self.point_m_arr.append(topic2_data)
-            self.i = self.i + 1
-            # If we have 3 points, we can calculate the transformation
-            if self.i == 3:
-                # Calculate the transformation with the Q2M_Transformer class
-                q2m = Q2M_Transformer()
-                rs_x, rs_y, ksb = q2m.main(self.point_q_arr, self.point_m_arr)
-                # If the transformation is correct, we add it to the list
-                if rs_x is not None and rs_y is not None and ksb is not None:
-                    if len(rs_x) != 0 and len(rs_y) != 0:
-                        self.ksbase_list.append(ksb)
-                        for s in rs_x:
-                            self.xy_list.append(s)
-                        for s in rs_y:
-                            self.xy_list.append(s)
-                # Clear the lists for the next 3 points
-                self.point_q_arr.clear()
-                self.point_m_arr.clear()
-                # Check the transformation with the current received points
-                for s in self.xy_list:
-                    self.transform_point(topic1_data, topic2_data, self.ksbase_list[0][0], self.ksbase_list[0][1], s)
-                # Clear the lists for the next 3 points
-                self.ksbase_list.clear()
-                self.xy_list.clear()
-                self.i = 0
-
-    # Callback functions for the topics
-    def callback_1(self, data):
-        self.topic1_data = data
-
-    def callback_2(self, data):
-        self.topic2_data = data
-        # Because the topics are not synchronized, we use the slowest topic as a trigger for the procedure
-        if self.i < 3:
-            self.process_data(self.topic1_data, self.topic2_data)
-            
-    def load_config(self, path):
-        with open(path, 'r') as config:#
-            return json.load(config)
-
-    # init function
-    # will activate the node and subscribe to the topics
+class TransformationCalculator:
     def __init__(self):
-        rospy.init_node('transformation_mocap', anonymous=True)
-        rospy.loginfo("Start")
-        self.publish_transformation = rospy.get_param("~general_parameters/publish_transformation", False)
-        self.use_median = rospy.get_param("~general_parameters/use_median", False)
-        self.good_tranformations = rospy.get_param("~general_parameters/good_transformations", 50)
-        self.print_transformation = rospy.get_param("~general_parameters/print_all_transformations", False)
-        self.qualisys_topic = rospy.get_param("~general_parameters/qualisys_topic", "/qualisys/mur620b/pose")
-        self.mir_topic = rospy.get_param("~general_parameters/mir_topic", "/mur620d/robot_pose")
-        rospy.Subscriber(self.qualisys_topic, PoseStamped, self.callback_1)
-        rospy.Subscriber(self.mir_topic, Pose, self.callback_2)
-        self.rate = rospy.Rate(10)
+        rospy.init_node('transformation_calculator')
+
+        # Parameter
+        robot_pose_map_topic = rospy.get_param('~robot_pose_map_topic', '/mur620d/robot_pose')  # Topic für die Roboterpose im Map-KS
+        robot_pose_mocap_topic = rospy.get_param('~robot_pose_mocap_topic', '/qualisys/mur620d/pose')  # Topic für die Roboterpose im MoCap-KS
+        odom_topic = rospy.get_param('~odom_topic', '/mur620d/odom')  # Topic für die Odometrie
+        self.minimum_pose_pairs = rospy.get_param('~minimum_pose_pairs', 3)  # Mindestanzahl der benötigten Pose-Paare
+        self.velocity_threshold_linear = rospy.get_param('~velocity_threshold_linear', 0.01)  # Schwelle für lineare Geschwindigkeit (m/s)
+        self.velocity_threshold_angular = rospy.get_param('~velocity_threshold_angular', 0.01)  # Schwelle für Winkelgeschwindigkeit (rad/s)
+        self.lock = Lock()
+
+
+        # Listen für gemittelte Pose-Paare
+        self.pose_pairs = []
+
+        # Temporäre Listen für Posen während des Stillstands
+        self.temp_map_poses = []
+        self.temp_mocap_poses = []
+
+        # Variablen für die Geschwindigkeiten des Roboters
+        self.current_linear_velocity = 0.0
+        self.current_angular_velocity = 0.0
+
+        # Zustandsvariable, ob der Roboter gerade stillsteht
+        self.robot_stationary = False
+
+        # Subscribers
+        self.map_pose_sub = rospy.Subscriber(robot_pose_map_topic, Pose, self.map_pose_callback)
+        self.mocap_pose_sub = rospy.Subscriber(robot_pose_mocap_topic, PoseStamped, self.mocap_pose_callback)
+        self.odom_sub = rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
+
+        # Service zum Auslösen der Transformation
+        self.transform_service = rospy.Service('~compute_transformation', Empty, self.compute_transformation_service)
+
+        rospy.loginfo("Transformation Calculator gestartet.")
+        rospy.loginfo("Bewegen Sie den Roboter zu verschiedenen Positionen und halten Sie ihn an, um Daten zu sammeln.")
+        rospy.loginfo("Rufen Sie den Service '/transformation_calculator/compute_transformation' auf, um die Transformation zu berechnen.")
+
+    def odom_callback(self, msg):
+        # Aktualisiert die aktuellen Geschwindigkeiten des Roboters
+        self.current_linear_velocity = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
+        self.current_angular_velocity = abs(msg.twist.twist.angular.z)
+        # Überprüft, ob der Roboter jetzt stillsteht
+        stationary = self.is_robot_stationary()
+        if stationary and not self.robot_stationary:
+            rospy.loginfo("Roboter ist jetzt im Stillstand. Beginne mit Datensammlung.")
+            self.robot_stationary = True
+        elif not stationary and self.robot_stationary:
+            rospy.loginfo("Roboter hat sich bewegt. Berechne gemittelte Pose.")
+            self.robot_stationary = False
+            self.compute_average_pose()
+
+    def is_robot_stationary(self):
+        # Überprüft, ob der Roboter stillsteht
+        return (self.current_linear_velocity < self.velocity_threshold_linear and
+                self.current_angular_velocity < self.velocity_threshold_angular)
+
+    def map_pose_callback(self, msg):
+        if self.robot_stationary:
+            with self.lock:
+                self.temp_map_poses.append(msg)
+
+    def mocap_pose_callback(self, msg):
+        if self.robot_stationary:
+            with self.lock:
+                self.temp_mocap_poses.append(msg.pose)
+
+    def compute_average_pose(self):
+        with self.lock:
+            rospy.loginfo(f"Gesammelte Map Poses: {len(self.temp_map_poses)}")
+            rospy.loginfo(f"Gesammelte Mocap Poses: {len(self.temp_mocap_poses)}")
+            if len(self.temp_map_poses) > 0 and len(self.temp_mocap_poses) > 0:
+                # Mittelung der Map-Posen
+                avg_map_pose = self.average_poses(self.temp_map_poses)
+
+                # Mittelung der MoCap-Posen
+                avg_mocap_pose = self.average_poses(self.temp_mocap_poses)
+
+                # Speichern des Pose-Paares
+                self.pose_pairs.append((avg_map_pose, avg_mocap_pose))
+                rospy.loginfo(f"Gesammelte Pose-Paare: {len(self.pose_pairs)}")
+
+                # Leeren der temporären Listen
+                self.temp_map_poses = []
+                self.temp_mocap_poses = []
+
+                # Überprüfen, ob die Mindestanzahl erreicht ist
+                if len(self.pose_pairs) >= self.minimum_pose_pairs:
+                    rospy.loginfo("Mindestanzahl an Pose-Paaren erreicht. Sie können nun den Service aufrufen, um die Transformation zu berechnen.")
+            else:
+                rospy.logwarn("Nicht genügend Posen für Mittelung während des Stillstands.")
+
+    def average_poses(self, poses):
+        # Mittelung der Positionen
+        positions = np.array([[pose.position.x, pose.position.y, pose.position.z] for pose in poses])
+        avg_position = np.mean(positions, axis=0)
+
+        # Mittelung der Orientierungen (Quaternionen)
+        quaternions = np.array([[pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w] for pose in poses])
+        avg_quaternion = self.average_quaternions(quaternions)
+
+        # Erstellen der gemittelten Pose
+        avg_pose = PoseStamped().pose
+        avg_pose.position.x = avg_position[0]
+        avg_pose.position.y = avg_position[1]
+        avg_pose.position.z = avg_position[2]
+        avg_pose.orientation.x = avg_quaternion[0]
+        avg_pose.orientation.y = avg_quaternion[1]
+        avg_pose.orientation.z = avg_quaternion[2]
+        avg_pose.orientation.w = avg_quaternion[3]
+
+        return avg_pose
+
+    def average_quaternions(self, quaternions):
+        # Gewichtete Mittelung der Quaternionen
+        # Hier wird die Methode von Markley verwendet
+        A = np.zeros((4, 4))
+        for q in quaternions:
+            q = q / np.linalg.norm(q)  # Normierung
+            A += np.outer(q, q)
+        eigenvalues, eigenvectors = np.linalg.eigh(A)
+        avg_quaternion = eigenvectors[:, np.argmax(eigenvalues)]
+        return avg_quaternion
+
+    def compute_transformation_service(self, request):
+        with self.lock:
+            if len(self.pose_pairs) < self.minimum_pose_pairs:
+                rospy.logerr("Nicht genügend Pose-Paare für die Berechnung der Transformation.")
+                return EmptyResponse()
+
+            # Berechnung der Transformation basierend auf den gesammelten Pose-Paaren
+            R, t = self.compute_transformation(self.pose_pairs)
+
+            rospy.loginfo("Transformation vom MoCap-KS zum Map-KS:")
+            rospy.loginfo("Rotationsmatrix:")
+            rospy.loginfo(R)
+            rospy.loginfo("Translationsvektor:")
+            rospy.loginfo(t)
+
+            # Transformationsmatrix erstellen
+            transformation_matrix = np.identity(4)
+            transformation_matrix[0:3, 0:3] = R
+            transformation_matrix[0:3, 3] = t
+
+            # Quaternion aus der Rotationsmatrix erhalten
+            q = quaternion_from_matrix(transformation_matrix)
+
+            # Transform veröffentlichen
+            br = tf.TransformBroadcaster()
+            rate = rospy.Rate(10)
+            rospy.loginfo("Veröffentliche Transformation zwischen 'map' und 'mocap' Frames.")
+            while not rospy.is_shutdown():
+                br.sendTransform(t,
+                                 q,
+                                 rospy.Time.now(),
+                                 "map",
+                                 "mocap")
+                rate.sleep()
+        return EmptyResponse()
+
+    def compute_transformation(self, pose_pairs):
+        # Extrahiert Positionen
+        map_positions = np.array([[pose.position.x, pose.position.y, pose.position.z] for pose, _ in pose_pairs])
+        mocap_positions = np.array([[pose.position.x, pose.position.y, pose.position.z] for _, pose in pose_pairs])
+
+        # Berechnet die Zentren
+        centroid_map = np.mean(map_positions, axis=0)
+        centroid_mocap = np.mean(mocap_positions, axis=0)
+
+        # Zentriert die Positionen
+        map_centered = map_positions - centroid_map
+        mocap_centered = mocap_positions - centroid_mocap
+
+        # Berechnet die Kovarianzmatrix
+        H = np.dot(mocap_centered.T, map_centered)
+
+        # Führt SVD durch
+        U, S, Vt = np.linalg.svd(H)
+        R = np.dot(Vt.T, U.T)
+
+        # Korrigiert für Reflektion
+        if np.linalg.det(R) < 0:
+            Vt[2, :] *= -1
+            R = np.dot(Vt.T, U.T)
+
+        # Berechnet die Translation
+        t = centroid_map - np.dot(R, centroid_mocap)
+
+        return R, t
+
+    def run(self):
         rospy.spin()
-    
+
 if __name__ == '__main__':
-    m = Main()
-    m.__init__()
+    try:
+        node = TransformationCalculator()
+        node.run()
+    except rospy.ROSInterruptException:
+        pass
