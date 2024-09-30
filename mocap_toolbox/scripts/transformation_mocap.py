@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import rospy
 import tf
 import numpy as np
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from nav_msgs.msg import Odometry
 from threading import Lock
 from tf.transformations import quaternion_matrix, quaternion_from_matrix
@@ -15,13 +15,14 @@ class TransformationCalculator:
         rospy.init_node('transformation_calculator')
 
         # Parameter
-        robot_pose_map_topic = rospy.get_param('~robot_pose_map_topic', '/robot_pose_map')  # Topic für die Roboterpose im Map-KS
-        robot_pose_mocap_topic = rospy.get_param('~robot_pose_mocap_topic', '/mur620d/robot_pose')  # Topic für die Roboterpose im MoCap-KS
+        robot_pose_map_topic = rospy.get_param('~robot_pose_map_topic', '/mur620d/robot_pose')  # Topic für die Roboterpose im Map-KS
+        robot_pose_mocap_topic = rospy.get_param('~robot_pose_mocap_topic', '/qualisys/mur620d/pose')  # Topic für die Roboterpose im MoCap-KS
         odom_topic = rospy.get_param('~odom_topic', '/mur620d/odom')  # Topic für die Odometrie
         self.minimum_pose_pairs = rospy.get_param('~minimum_pose_pairs', 3)  # Mindestanzahl der benötigten Pose-Paare
         self.velocity_threshold_linear = rospy.get_param('~velocity_threshold_linear', 0.01)  # Schwelle für lineare Geschwindigkeit (m/s)
         self.velocity_threshold_angular = rospy.get_param('~velocity_threshold_angular', 0.01)  # Schwelle für Winkelgeschwindigkeit (rad/s)
         self.lock = Lock()
+
 
         # Listen für gemittelte Pose-Paare
         self.pose_pairs = []
@@ -38,7 +39,7 @@ class TransformationCalculator:
         self.robot_stationary = False
 
         # Subscribers
-        self.map_pose_sub = rospy.Subscriber(robot_pose_map_topic, PoseStamped, self.map_pose_callback)
+        self.map_pose_sub = rospy.Subscriber(robot_pose_map_topic, Pose, self.map_pose_callback)
         self.mocap_pose_sub = rospy.Subscriber(robot_pose_mocap_topic, PoseStamped, self.mocap_pose_callback)
         self.odom_sub = rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
 
@@ -71,7 +72,7 @@ class TransformationCalculator:
     def map_pose_callback(self, msg):
         if self.robot_stationary:
             with self.lock:
-                self.temp_map_poses.append(msg.pose)
+                self.temp_map_poses.append(msg)
 
     def mocap_pose_callback(self, msg):
         if self.robot_stationary:
@@ -80,6 +81,8 @@ class TransformationCalculator:
 
     def compute_average_pose(self):
         with self.lock:
+            rospy.loginfo(f"Gesammelte Map Poses: {len(self.temp_map_poses)}")
+            rospy.loginfo(f"Gesammelte Mocap Poses: {len(self.temp_mocap_poses)}")
             if len(self.temp_map_poses) > 0 and len(self.temp_mocap_poses) > 0:
                 # Mittelung der Map-Posen
                 avg_map_pose = self.average_poses(self.temp_map_poses)
