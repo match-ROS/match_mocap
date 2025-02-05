@@ -10,12 +10,22 @@
 </include>
 
 <!-- launch tf static transform publisher -->
-<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="38.2691 32.8942 0 3.1206 0 0 map mocap 1" />
+<!-- (x, y, z, yaw, pitch, roll) -->
+<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="35.32823248 26.34253325 -0.83941275 -0.008787453 0 0 map mocap 1" />
 
+
+<!-- "35.6037 27.7603 0 3.1389 0 0 map mocap 1" -->
+<!-- "31.5042 27.9229 0 3.1245 0 0 map mocap 1" -->
+
+<!-- "38.2691 32.8942 0 3.1206 0 0 map mocap 1 -->
+
+<!-- Map: Scale_240208 -->
+<!-- 23.9078 36.8491 0 -1.753859986 0 0 map mocap 1 -->
 
 <node pkg="mocap_toolbox" type="mocap_transformer.py" name="mocap_map_transformer" output="screen">
     <param name="target_frame" value="map"/>
 </node>
+
 
 
 </launch>
