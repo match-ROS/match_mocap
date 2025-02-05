@@ -1,6 +1,6 @@
 robot_pose_mocap_topic: /qualisys/mur620d/pose
 robot_pose_map_topic: /mur620d/robot_pose
 odom_topic: /mur620d/odom
-minimum_pose_pairs: 17
+minimum_pose_pairs: 10
 velocity_threshold_linear: 0.01
 velocity_threshold_angular: 0.01

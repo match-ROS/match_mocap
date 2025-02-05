@@ -22,8 +22,6 @@ class TransformationCalculator:
         self.velocity_threshold_linear = rospy.get_param('~velocity_threshold_linear', 0.01)  # Schwelle für lineare Geschwindigkeit (m/s)
         self.velocity_threshold_angular = rospy.get_param('~velocity_threshold_angular', 0.01)  # Schwelle für Winkelgeschwindigkeit (rad/s)
         self.lock = Lock()
-        rospy.loginfo(f"Mocap Topic: {robot_pose_mocap_topic}")
-        rospy.loginfo(f"Mocap Topic: {robot_pose_map_topic}")
 
         # Listen für gemittelte Pose-Paare
         self.pose_pairs = []
@@ -82,7 +80,8 @@ class TransformationCalculator:
 
     def compute_average_pose(self):
         with self.lock:
-            rospy.loginfo(f"Pair Poses: {len(self.pose_pairs)}")
+            rospy.loginfo(f"Gesammelte Map Poses: {len(self.temp_map_poses)}")
+            rospy.loginfo(f"Gesammelte Mocap Poses: {len(self.temp_mocap_poses)}")
             if len(self.temp_map_poses) > 0 and len(self.temp_mocap_poses) > 0:
                 # Mittelung der Map-Posen
                 avg_map_pose = self.average_poses(self.temp_map_poses)
@@ -92,7 +91,7 @@ class TransformationCalculator:
 
                 # Speichern des Pose-Paares
                 self.pose_pairs.append((avg_map_pose, avg_mocap_pose))
-                
+                rospy.loginfo(f"Gesammelte Pose-Paare: {len(self.pose_pairs)}")
 
                 # Leeren der temporären Listen
                 self.temp_map_poses = []
@@ -101,13 +100,6 @@ class TransformationCalculator:
                 # Überprüfen, ob die Mindestanzahl erreicht ist
                 if len(self.pose_pairs) >= self.minimum_pose_pairs:
                     rospy.loginfo("Mindestanzahl an Pose-Paaren erreicht. Sie können nun den Service aufrufen, um die Transformation zu berechnen.")
-                    R, t = self.compute_transformation(self.pose_pairs)
-                    rospy.loginfo("Transformation vom MoCap-KS zum Map-KS:")
-                    rospy.loginfo("Rotationsmatrix:")
-                    rospy.loginfo(R)
-                    rospy.loginfo("Translationsvektor:")
-                    rospy.loginfo(t)
-                            
             else:
                 rospy.logwarn("Nicht genügend Posen für Mittelung während des Stillstands.")
 
@@ -143,8 +135,6 @@ class TransformationCalculator:
         avg_quaternion = eigenvectors[:, np.argmax(eigenvalues)]
         return avg_quaternion
 
-
-    
     def compute_transformation_service(self, request):
         with self.lock:
             if len(self.pose_pairs) < self.minimum_pose_pairs:

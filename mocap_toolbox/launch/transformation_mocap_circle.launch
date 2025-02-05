@@ -1,11 +1,4 @@
 <launch>
-
-    <!-- Usually used
-    <rosparam file="$(find mocap_toolbox)/config/transformation_mocap.yaml" command="load"/>
-    -->
-<!-- "35.98410905 24.73423293 0 -3.032008541863099 0 0 map mocap 1" -->
-    <!-- For Bachelorabeit about amcl-->
     <rosparam file="$(find mocap_toolbox)/config/transformation_mocap_circle.yaml" command="load"/>
-
     <node name="transformation_mocap" pkg="mocap_toolbox" type="transformation_mocap_circle.py" output="screen"/>
 </launch>

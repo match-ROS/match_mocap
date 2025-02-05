@@ -10,8 +10,7 @@
 </include>
 
 <!-- launch tf static transform publisher -->
-<!-- (x, y, z, yaw, pitch, roll) -->
-<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="35.32823248 26.34253325 -0.83941275 -0.008787453 0 0 map mocap 1" />
+<node pkg="tf" type="static_transform_publisher" name="map_to_mocap" args="38.2691 32.8942 0 3.1656 0 0 map mocap 1" />
 
 
 <!-- "35.6037 27.7603 0 3.1389 0 0 map mocap 1" -->

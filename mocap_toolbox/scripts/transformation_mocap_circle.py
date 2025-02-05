@@ -339,7 +339,7 @@ class Main():
         self.use_median = rospy.get_param("~general_parameters/use_median", False)
         self.good_tranformations = rospy.get_param("~general_parameters/good_transformations", 50)
         self.print_transformation = rospy.get_param("~general_parameters/print_all_transformations", False)
-        self.qualisys_topic = rospy.get_param("~general_parameters/qualisys_topic", "/qualisys/mur620d/pose")
+        self.qualisys_topic = rospy.get_param("~general_parameters/qualisys_topic", "/qualisys/mur620b/pose")
         self.mir_topic = rospy.get_param("~general_parameters/mir_topic", "/mur620d/robot_pose")
         rospy.Subscriber(self.qualisys_topic, PoseStamped, self.callback_1)
         rospy.Subscriber(self.mir_topic, Pose, self.callback_2)
