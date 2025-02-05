@@ -35,15 +35,18 @@ class MocapTransformerNode:
         rospy.spin()
 
     def discover_mocap_topics(self):
-        # Use master API to get list of published topics
+        """Retrieve all currently published mocap topics"""
         try:
             all_topics_with_type = rospy.get_published_topics("/qualisys/")
         except rospy.exceptions.ROSException as e:
             rospy.logerr(f"Failed to get published topics: {e}")
             return
 
-        # Extract topics under /mocap/* that are of type geometry_msgs/PoseStamped
-        mocap_topics = [topic[0].replace("/qualisys","") for topic in all_topics_with_type if topic[1] == "geometry_msgs/PoseStamped"]
+        # Extract topics under /qualisys/* that are of type geometry_msgs/PoseStamped
+        mocap_topics = [
+            topic[0].replace("/qualisys", "", 1).lstrip("/")  # Remove only the first occurrence and trim leading slash
+            for topic in all_topics_with_type if topic[1] == "geometry_msgs/PoseStamped"
+        ]
 
         if not mocap_topics:
             rospy.logwarn("No mocap topics found. Make sure mocap topics are being published.")
@@ -52,9 +55,20 @@ class MocapTransformerNode:
         
         self.mocap_topics = mocap_topics
 
+
     def mocap_callback(self, pose_stamped, topic):
-        try:            
-            # Transform the pose
+        """Transforms the received mocap pose to the target frame and republishes it"""
+        try:
+            # Wait for the transform to be available
+            self.tf_listener.waitForTransform(
+                self.target_frame, pose_stamped.header.frame_id, pose_stamped.header.stamp, rospy.Duration(0.5)
+            )
+
+            # Synchronize the timestamp to avoid extrapolation issues
+            latest_time = self.tf_listener.getLatestCommonTime(self.target_frame, pose_stamped.header.frame_id)
+            pose_stamped.header.stamp = latest_time  # Adjust the timestamp
+            
+            # Transform the pose to the target frame
             transformed_pose = self.tf_listener.transformPose(self.target_frame, pose_stamped)
 
             # Publish the transformed pose on /mocap_map/*
